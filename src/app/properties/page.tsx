@@ -695,8 +695,10 @@ export default function PropertiesPage() {
                                 variant="primary"
                                 className="w-full text-xs flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
                                 onClick={() => openInquiryModal(unit)}
+                                leftIcon={
+                                  <Mail className="w-3.5 h-3.5 shrink-0" />
+                                }
                               >
-                                <Mail className="w-3.5 h-3.5 shrink-0" />
                                 <span>{t.actions.inquire}</span>
                               </Button>
                             ) : (
