@@ -581,40 +581,53 @@ export default function PropertiesPage() {
         filteredProjects.map((project) => (
           <Card key={project.id} className="overflow-hidden">
             {/* Project Header Banner */}
-            <div className="p-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold">{project.name}</h2>
+            <div className="p-6 bg-gradient-to-r from-purple-50/70 via-indigo-50/40 to-slate-50 dark:from-slate-900 dark:via-purple-950/40 dark:to-slate-900 border-b border-slate-200/80 dark:border-slate-800 text-slate-900 dark:text-white flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+              {/* Subtle Blueprint Dot Grid Accent */}
+              <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.07] [background-image:radial-gradient(#7c3aed_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+
+              <div className="relative z-10">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    {project.name}
+                  </h2>
                   <Badge variant="purple" size="sm">
                     {project.status.replace("_", " ")}
                   </Badge>
                 </div>
-                <p className="text-xs text-slate-300 mt-1 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
                   <span>{project.location}</span>
                 </p>
+
                 {project.description && (
-                  <p className="text-xs text-slate-400 mt-2 max-w-2xl">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 max-w-2xl leading-relaxed">
                     {project.description}
                   </p>
                 )}
               </div>
 
               {/* Project Stats Pill */}
-              <div className="flex items-center gap-3 bg-white/10 backdrop-blur-xs px-4 py-2 rounded-xl text-xs shrink-0 border border-white/10">
+              <div className="relative z-10 flex items-center gap-4 bg-white/90 dark:bg-slate-800/80 backdrop-blur-xs px-4 py-2.5 rounded-xl text-xs shrink-0 border border-slate-200/80 dark:border-slate-700 shadow-2xs">
                 <div>
-                  <span className="text-slate-400 block">Total Units</span>
-                  <span className="font-bold text-sm">
+                  <span className="text-[11px] font-medium text-slate-400 dark:text-slate-400 block uppercase tracking-wider">
+                    Total Units
+                  </span>
+                  <span className="font-bold text-sm text-slate-800 dark:text-slate-100">
                     {project.buildings?.reduce(
                       (acc, b) => acc + (b.units?.length || 0),
                       0,
                     )}
                   </span>
                 </div>
-                <div className="w-px h-8 bg-white/20" />
+
+                <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
+
                 <div>
-                  <span className="text-emerald-400 block">Available</span>
-                  <span className="font-bold text-sm text-emerald-300">
+                  <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 block uppercase tracking-wider">
+                    Available
+                  </span>
+                  <span className="font-bold text-sm text-emerald-700 dark:text-emerald-300">
                     {project.buildings?.reduce(
                       (acc, b) =>
                         acc +

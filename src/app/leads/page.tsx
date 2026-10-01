@@ -10,6 +10,20 @@ import { Select } from "@/components/ui/Select";
 import { Badge, BadgeVariant } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { LeadResponse, LeadNoteResponse } from "@/models/leadModel";
+import {
+  UserPlus,
+  Search,
+  Eye,
+  Phone,
+  Mail,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  X,
+  Clock,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
 
 export default function LeadsPage() {
   const { user, isLoading: authLoading } = useRequireAuth();
@@ -24,6 +38,9 @@ export default function LeadsPage() {
     Array<{ id: string; name: string; role: string }>
   >([]);
 
+  // Stage Metrics for Pill Badges
+  const [stageCounts, setStageCounts] = useState<Record<string, number>>({});
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -35,7 +52,7 @@ export default function LeadsPage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<LeadResponse | null>(null);
 
-  // Staged states for Lead Detail Modal (Explicit Save/Cancel)
+  // Staged states for Lead Detail Modal
   const [stagedStage, setStagedStage] = useState("");
   const [stagedAssignedToId, setStagedAssignedToId] = useState("");
   const [saveChangesSubmitting, setSaveChangesSubmitting] = useState(false);
@@ -56,20 +73,31 @@ export default function LeadsPage() {
   const [noteFollowUpDate, setNoteFollowUpDate] = useState("");
   const [noteSubmitting, setNoteSubmitting] = useState(false);
 
-  // Load Team Members (for Admin assignment filter and dropdown)
+  // Load Team Members & Stage Counts
   useEffect(() => {
-    async function loadTeam() {
+    async function loadInitialData() {
       try {
-        const res = await fetch("/api/auth?team=true");
-        if (res.ok) {
-          const json = await res.json();
+        const [teamRes, metricsRes] = await Promise.all([
+          fetch("/api/auth?team=true"),
+          fetch("/api/leads?metrics=true"),
+        ]);
+
+        if (teamRes.ok) {
+          const json = await teamRes.json();
           if (json.success && json.data) setTeamMembers(json.data);
         }
+
+        if (metricsRes.ok) {
+          const mJson = await metricsRes.json();
+          if (mJson.success && mJson.data?.stageCounts) {
+            setStageCounts(mJson.data.stageCounts);
+          }
+        }
       } catch (err) {
-        console.error("Error fetching team members:", err);
+        console.error("Error loading team/metrics:", err);
       }
     }
-    loadTeam();
+    loadInitialData();
   }, []);
 
   // Fetch Leads with Limit 10
@@ -128,7 +156,6 @@ export default function LeadsPage() {
     }
   };
 
-  // Stage Badge Variant Mapping
   const getStageBadgeVariant = (stage: string): BadgeVariant => {
     switch (stage) {
       case "NEW":
@@ -150,7 +177,13 @@ export default function LeadsPage() {
     }
   };
 
-  // Open Lead Detail
+  const getInitials = (name: string) => {
+    if (!name) return "LD";
+    const parts = name.trim().split(" ");
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
   const handleOpenDetail = async (lead: LeadResponse) => {
     setSelectedLead(lead);
     setStagedStage(lead.stage);
@@ -158,7 +191,6 @@ export default function LeadsPage() {
     setSaveSuccessMsg("");
     setDetailModalOpen(true);
 
-    // Fetch full lead with latest notes
     try {
       const res = await fetch(`/api/leads/${lead.id}`);
       if (res.ok) {
@@ -172,7 +204,6 @@ export default function LeadsPage() {
     }
   };
 
-  // Explicit Save Changes for Stage / Assignment
   const handleSaveChanges = async () => {
     if (!selectedLead) return;
     setSaveChangesSubmitting(true);
@@ -219,7 +250,6 @@ export default function LeadsPage() {
     }
   };
 
-  // Cancel / Discard Dirty Changes in Detail Modal
   const handleCancelChanges = () => {
     if (selectedLead) {
       setStagedStage(selectedLead.stage);
@@ -234,7 +264,6 @@ export default function LeadsPage() {
       (user?.role === "ADMIN" &&
         stagedAssignedToId !== (selectedLead.assignedToId || "")));
 
-  // Create Lead Submit
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateError("");
@@ -266,7 +295,6 @@ export default function LeadsPage() {
         return;
       }
 
-      // Reset form & reload
       setNewName("");
       setNewEmail("");
       setNewPhone("");
@@ -281,7 +309,6 @@ export default function LeadsPage() {
     }
   };
 
-  // Add Note Submit
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLead || !noteContent.trim()) return;
@@ -302,7 +329,6 @@ export default function LeadsPage() {
         if (json.success) {
           setNoteContent("");
           setNoteFollowUpDate("");
-          // Refresh lead details
           const updatedRes = await fetch(`/api/leads/${selectedLead.id}`);
           if (updatedRes.ok) {
             const uJson = await updatedRes.json();
@@ -317,17 +343,57 @@ export default function LeadsPage() {
     }
   };
 
-  // Columns definition for Adaptive Table
+  // Filter Pill Configuration
+  const filterPills = [
+    { key: "", label: "All Leads", count: totalCount },
+    { key: "NEW", label: t.stages.NEW, count: stageCounts.NEW || 0 },
+    {
+      key: "CONTACTED",
+      label: t.stages.CONTACTED,
+      count: stageCounts.CONTACTED || 0,
+    },
+    {
+      key: "SITE_VISIT",
+      label: t.stages.SITE_VISIT,
+      count: stageCounts.SITE_VISIT || 0,
+    },
+    {
+      key: "INTERESTED",
+      label: t.stages.INTERESTED,
+      count: stageCounts.INTERESTED || 0,
+    },
+    {
+      key: "NEGOTIATION",
+      label: t.stages.NEGOTIATION,
+      count: stageCounts.NEGOTIATION || 0,
+    },
+    { key: "BOOKED", label: t.stages.BOOKED, count: stageCounts.BOOKED || 0 },
+    { key: "LOST", label: t.stages.LOST, count: stageCounts.LOST || 0 },
+  ];
+
+  // Upgraded Columns definition with 2-Line Rich Cells & Action Icons
   const columns: Column<LeadResponse>[] = [
     {
       header: "Customer",
       cell: (lead) => (
-        <div className="space-y-0.5">
-          <p className="font-semibold text-slate-900 dark:text-white">
-            {lead.name}
-          </p>
-          <p className="text-xs text-slate-400">{lead.email}</p>
-          <p className="text-xs text-slate-400">{lead.phone}</p>
+        <div className="flex sm:items-center sm:gap-3 justify-end sm:justify-start">
+          {/* Avatar: Hidden on mobile cards, visible on desktop/table */}
+          <div className="hidden sm:flex w-9 h-9 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 font-bold text-xs items-center justify-center shrink-0 border border-purple-200/80 dark:border-purple-800">
+            {getInitials(lead.name)}
+          </div>
+
+          {/* Text block: Right-aligned on mobile card, left-aligned on desktop table */}
+          <div className="text-right sm:text-left min-w-0">
+            <p className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+              {lead.name}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5 truncate max-w-[170px] sm:max-w-none">
+              {lead.email}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium tracking-tight">
+              {lead.phone}
+            </p>
+          </div>
         </div>
       ),
     },
@@ -342,7 +408,7 @@ export default function LeadsPage() {
     {
       header: "Budget",
       cell: (lead) => (
-        <span className="font-medium text-slate-800 dark:text-slate-200">
+        <span className="font-bold text-sm text-slate-900 dark:text-white">
           {lead.budget ? `₹${Number(lead.budget).toLocaleString()}` : "—"}
         </span>
       ),
@@ -352,10 +418,14 @@ export default function LeadsPage() {
       cell: (lead) => (
         <div>
           {lead.assignedTo ? (
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-indigo-500" />
-              {lead.assignedTo.name}
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[10px] flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                {getInitials(lead.assignedTo.name)}
+              </div>
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                {lead.assignedTo.name}
+              </span>
+            </div>
           ) : (
             <Badge variant="neutral" size="sm">
               Unassigned
@@ -368,7 +438,8 @@ export default function LeadsPage() {
       header: "Interested Unit",
       cell: (lead) =>
         lead.interestedUnit ? (
-          <span className="text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/70 dark:border-purple-800">
+            <Building2 className="w-3.5 h-3.5 text-purple-500" />
             {lead.interestedUnit.unitNumber}
           </span>
         ) : (
@@ -376,19 +447,37 @@ export default function LeadsPage() {
         ),
     },
     {
-      header: "Action",
+      header: "Actions",
       align: "right",
       cell: (lead) => (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleOpenDetail(lead);
-          }}
-        >
-          {t.actions.viewDetails}
-        </Button>
+        <div className="flex items-center justify-end gap-1.5">
+          <a
+            href={`tel:${lead.phone}`}
+            onClick={(e) => e.stopPropagation()}
+            title="Call Prospect"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Phone className="w-4 h-4" />
+          </a>
+          <a
+            href={`mailto:${lead.email}`}
+            onClick={(e) => e.stopPropagation()}
+            title="Email Prospect"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Mail className="w-4 h-4" />
+          </a>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenDetail(lead);
+            }}
+            title="Inspect Details"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-slate-800 transition-colors ml-1"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+        </div>
       ),
     },
   ];
@@ -396,19 +485,24 @@ export default function LeadsPage() {
   if (authLoading || !user) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Top Header & New Lead Trigger */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            {t.nav.leads}
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+              {t.nav.leads}
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800">
+              {totalCount} Total
+            </span>
+          </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Track inquiries, stage progressions, interactions, and bookings
           </p>
@@ -417,13 +511,47 @@ export default function LeadsPage() {
           onClick={() => setCreateModalOpen(true)}
           variant="primary"
           size="md"
+          className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-xs flex items-center gap-2"
+          leftIcon={<UserPlus className="w-4 h-4" />}
         >
-          + {t.actions.createLead}
+          <span>{t.actions.createLead}</span>
         </Button>
       </div>
 
+      {/* Stage Filter Pills Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {filterPills.map((pill) => {
+          const isActive = selectedStage === pill.key;
+          return (
+            <button
+              key={pill.key}
+              onClick={() => {
+                setSelectedStage(pill.key);
+                setCurrentPage(1);
+              }}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 transition-all shrink-0 cursor-pointer ${
+                isActive
+                  ? "bg-purple-600 text-white shadow-xs"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-800"
+              }`}
+            >
+              <span>{pill.label}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  isActive
+                    ? "bg-purple-500 text-white"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                }`}
+              >
+                {pill.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Filter and Search Bar */}
-      <div className="p-4 rounded-xl border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 shadow-xs">
+      <div className="p-3.5 rounded-2xl border border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 shadow-xs">
         <Input
           placeholder={t.actions.search}
           value={search}
@@ -432,7 +560,10 @@ export default function LeadsPage() {
 
         <Select
           value={selectedStage}
-          onChange={(e) => setSelectedStage(e.target.value)}
+          onChange={(e) => {
+            setSelectedStage(e.target.value);
+            setCurrentPage(1);
+          }}
           placeholder="Filter by Stage (All)"
           options={[
             { value: "", label: "All Stages" },
@@ -449,7 +580,10 @@ export default function LeadsPage() {
         {user?.role === "ADMIN" && (
           <Select
             value={selectedRep}
-            onChange={(e) => setSelectedRep(e.target.value)}
+            onChange={(e) => {
+              setSelectedRep(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Filter by Rep (All)"
             options={[
               { value: "", label: "All Representatives" },
@@ -463,10 +597,12 @@ export default function LeadsPage() {
           <Button
             variant="ghost"
             size="md"
+            className="rounded-xl text-xs font-semibold text-slate-500 hover:text-purple-600"
             onClick={() => {
               setSearch("");
               setSelectedStage("");
               setSelectedRep("");
+              setCurrentPage(1);
             }}
           >
             Clear Filters
@@ -474,22 +610,24 @@ export default function LeadsPage() {
         )}
       </div>
 
-      {/* Adaptive Responsive Leads Table with Limit-10 Pagination */}
-      <Table
-        columns={columns}
-        data={leads}
-        keyExtractor={(lead) => lead.id}
-        isLoading={loading}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalCount={totalCount}
-        onPageChange={handlePageChange}
-        onLoadMore={handleLoadMore}
-        isLoadingMore={isLoadingMore}
-        hasMore={currentPage < totalPages}
-        onRowClick={handleOpenDetail}
-        emptyMessage="No leads match your current search or filter criteria."
-      />
+      {/* Adaptive Responsive Leads Table */}
+      <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs overflow-hidden">
+        <Table
+          columns={columns}
+          data={leads}
+          keyExtractor={(lead) => lead.id}
+          isLoading={loading}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          onPageChange={handlePageChange}
+          onLoadMore={handleLoadMore}
+          isLoadingMore={isLoadingMore}
+          hasMore={currentPage < totalPages}
+          onRowClick={handleOpenDetail}
+          emptyMessage="No leads match your current search or filter criteria."
+        />
+      </div>
 
       {/* ------------------------------------------------------------- */}
       {/* CREATE LEAD MODAL                                             */}
@@ -498,11 +636,11 @@ export default function LeadsPage() {
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         title={t.actions.createLead}
-        description="Add an incoming prospect to your CRM pipeline"
+        description="Record a prospective buyer or investor into the active pipeline"
       >
         <form onSubmit={handleCreateLead} className="space-y-4">
           {createError && (
-            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300">
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300">
               {createError}
             </div>
           )}
@@ -566,10 +704,12 @@ export default function LeadsPage() {
             />
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-3">
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-slate-800">
             <Button
               type="button"
               variant="outline"
+              size="sm"
+              className="rounded-xl border-slate-200 dark:border-slate-700 text-xs"
               onClick={() => setCreateModalOpen(false)}
             >
               {t.actions.cancel}
@@ -577,6 +717,8 @@ export default function LeadsPage() {
             <Button
               type="submit"
               variant="primary"
+              size="sm"
+              className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
               isLoading={createSubmitting}
             >
               {t.actions.submit}
@@ -586,7 +728,7 @@ export default function LeadsPage() {
       </Modal>
 
       {/* ------------------------------------------------------------- */}
-      {/* LEAD DETAIL & ACTIVITY TIMELINE MODAL (WITH EXPLICIT SAVE/CANCEL) */}
+      {/* LEAD DETAIL & ACTIVITY TIMELINE MODAL                         */}
       {/* ------------------------------------------------------------- */}
       <Modal
         isOpen={detailModalOpen}
@@ -596,63 +738,84 @@ export default function LeadsPage() {
         description={`Inbound via ${selectedLead?.source} • ID: ${selectedLead?.id?.slice(0, 8)}`}
       >
         {selectedLead && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {/* Save Success Banner */}
             {saveSuccessMsg && (
-              <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-300">
-                ✓ {saveSuccessMsg}
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-300 font-semibold flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>{saveSuccessMsg}</span>
               </div>
             )}
 
-            {/* Compact Top Info Strip */}
-            <div className="grid grid-cols-3 gap-2 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800 text-xs">
-              <div>
-                <span className="text-slate-400 font-semibold uppercase text-[10px] block">
-                  Email
-                </span>
-                <p className="font-medium text-slate-900 dark:text-white truncate">
-                  {selectedLead.email}
-                </p>
+            {/* Quick Contact & Info Strip */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-850/60 border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <span className="text-slate-400 font-semibold uppercase text-[10px] block">
+                    Email
+                  </span>
+                  <p className="font-bold text-slate-900 dark:text-white truncate">
+                    {selectedLead.email}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-semibold uppercase text-[10px] block">
+                    Phone
+                  </span>
+                  <p className="font-bold text-slate-900 dark:text-white truncate">
+                    {selectedLead.phone}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-semibold uppercase text-[10px] block">
+                    Budget
+                  </span>
+                  <p className="font-extrabold text-slate-900 dark:text-white">
+                    {selectedLead.budget
+                      ? `₹${Number(selectedLead.budget).toLocaleString()}`
+                      : "—"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <span className="text-slate-400 font-semibold uppercase text-[10px] block">
-                  Phone
-                </span>
-                <p className="font-medium text-slate-900 dark:text-white truncate">
-                  {selectedLead.phone}
-                </p>
-              </div>
-              <div>
-                <span className="text-slate-400 font-semibold uppercase text-[10px] block">
-                  Budget
-                </span>
-                <p className="font-semibold text-slate-900 dark:text-white truncate">
-                  {selectedLead.budget
-                    ? `₹${Number(selectedLead.budget).toLocaleString()}`
-                    : "—"}
-                </p>
+
+              {/* Direct Touchpoint CTAs */}
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={`tel:${selectedLead.phone}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-emerald-600 transition-colors shadow-2xs"
+                >
+                  <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Call</span>
+                </a>
+                <a
+                  href={`mailto:${selectedLead.email}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-purple-600 transition-colors shadow-2xs"
+                >
+                  <Mail className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Email</span>
+                </a>
               </div>
             </div>
 
-            {/* 2-Column Desktop Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
-              {/* Left Column: Stage & Assignment Controls (5 cols) */}
-              <div className="lg:col-span-5 p-3 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/40 space-y-2.5">
+            {/* 2-Column Work Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+              {/* Left Column: Stage Transition & Assignment (5 cols) */}
+              <div className="lg:col-span-5 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Pipeline & Assignment
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Pipeline Controls
                   </h4>
                   {isDirty && (
-                    <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded">
-                      Unsaved
+                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200/60 dark:border-amber-900">
+                      Unsaved Changes
                     </span>
                   )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                      Stage Transition
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                      Sales Stage Transition
                     </label>
                     <Select
                       value={stagedStage}
@@ -683,8 +846,8 @@ export default function LeadsPage() {
 
                   {user?.role === "ADMIN" ? (
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Representative (Admin Only)
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                        Assigned Agent (Admin Only)
                       </label>
                       <Select
                         value={stagedAssignedToId}
@@ -700,23 +863,23 @@ export default function LeadsPage() {
                     </div>
                   ) : (
                     <div>
-                      <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Assigned Representative
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                        Assigned Agent
                       </label>
-                      <p className="text-xs font-medium text-slate-600 dark:text-slate-300 py-1">
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 py-1">
                         {selectedLead.assignedTo?.name || "Unassigned"}
                       </p>
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <Button
                     size="sm"
                     variant="outline"
                     disabled={!isDirty || saveChangesSubmitting}
                     onClick={handleCancelChanges}
-                    className="text-xs py-1 px-2.5 h-auto"
+                    className="text-xs rounded-lg"
                   >
                     {t.actions.cancel}
                   </Button>
@@ -726,22 +889,22 @@ export default function LeadsPage() {
                     disabled={!isDirty || saveChangesSubmitting}
                     isLoading={saveChangesSubmitting}
                     onClick={handleSaveChanges}
-                    className="text-xs py-1 px-2.5 h-auto"
+                    className="text-xs rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold"
                   >
                     {t.actions.save}
                   </Button>
                 </div>
               </div>
 
-              {/* Right Column: Add Note Form + Timeline Feed (7 cols) */}
-              <div className="lg:col-span-7 space-y-2">
-                {/* Add Note Form */}
+              {/* Right Column: Interaction Log & History (7 cols) */}
+              <div className="lg:col-span-7 space-y-3">
+                {/* Note Log Form */}
                 <form
                   onSubmit={handleAddNote}
-                  className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2"
+                  className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/40 space-y-2.5"
                 >
                   <Input
-                    placeholder="Log call outcome, site visit notes..."
+                    placeholder="Log call outcome, site visit notes, pricing feedback..."
                     required
                     value={noteContent}
                     onChange={(e) => setNoteContent(e.target.value)}
@@ -759,7 +922,7 @@ export default function LeadsPage() {
                       size="sm"
                       variant="primary"
                       isLoading={noteSubmitting}
-                      className="text-xs py-1.5 px-3 shrink-0"
+                      className="text-xs font-semibold rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-3 shrink-0"
                     >
                       {t.actions.addNote}
                     </Button>
@@ -767,39 +930,42 @@ export default function LeadsPage() {
                 </form>
 
                 {/* Timeline Feed */}
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <h4 className="text-[11px] uppercase font-bold tracking-wider text-slate-400">
-                    Recent Activity ({selectedLead.notes?.length || 0})
+                    Activity History ({selectedLead.notes?.length || 0})
                   </h4>
                   {!selectedLead.notes || selectedLead.notes.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic py-1">
-                      No notes recorded yet.
+                    <p className="text-xs text-slate-400 italic py-2">
+                      No customer interactions recorded yet.
                     </p>
                   ) : (
                     selectedLead.notes
-                      .slice(0, 2)
+                      .slice(0, 3)
                       .map((note: LeadNoteResponse) => (
                         <div
                           key={note.id}
-                          className="p-2 rounded-lg border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs space-y-1"
+                          className="p-2.5 rounded-xl border border-slate-150 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs space-y-1 shadow-2xs"
                         >
                           <div className="flex items-center justify-between text-slate-400 text-[10px]">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            <span className="font-bold text-slate-700 dark:text-slate-200">
                               {note.author?.name || "Representative"}
                             </span>
                             <span>
                               {new Date(note.createdAt).toLocaleDateString()}
                             </span>
                           </div>
-                          <p className="text-slate-600 dark:text-slate-300 line-clamp-2">
+                          <p className="text-slate-600 dark:text-slate-300">
                             {note.content}
                           </p>
                           {note.nextFollowUpDate && (
-                            <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
-                              ⏰ Follow-up:{" "}
-                              {new Date(
-                                note.nextFollowUpDate,
-                              ).toLocaleDateString()}
+                            <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1 mt-1">
+                              <Clock className="w-3 h-3" />
+                              <span>
+                                Follow-up scheduled:{" "}
+                                {new Date(
+                                  note.nextFollowUpDate,
+                                ).toLocaleDateString()}
+                              </span>
                             </div>
                           )}
                         </div>
